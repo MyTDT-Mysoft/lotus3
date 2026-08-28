@@ -16,7 +16,7 @@ pub struct State {
 }
 
 pub struct GameEngine {
-    task: Pin<Box<dyn Future<Output = Result<()>>>>,
+    task: Option<Pin<Box<dyn Future<Output = Result<()>>>>>,
 }
 
 impl GameEngine {
@@ -29,18 +29,26 @@ impl GameEngine {
         let state = State { arc, cfg, input };
 
         Ok(Self {
-            task: Box::pin(f(state)),
+            task: Some(Box::pin(f(state))),
         })
     }
 
     pub fn step(&mut self, ctx: &mut Context<'static>, signal: &Signal) -> Result<Poll<()>> {
-        Ok(match self.task.as_mut().poll(ctx) {
-            Poll::Pending => {
-                signal.wait();
+        match self.task.as_mut() {
+            Some(task) => match task.as_mut().poll(ctx) {
+                Poll::Pending => {
+                    signal.wait();
 
-                Poll::Pending
-            }
-            Poll::Ready(result) => Poll::Ready(result?),
-        })
+                    Ok(Poll::Pending)
+                }
+                Poll::Ready(result) => {
+                    // consume the completed task so it cannot be polled again
+                    self.task = None;
+                    Ok(Poll::Ready(result?))
+                }
+            },
+            // already completed, avoid polling again
+            None => Ok(Poll::Ready(())),
+        }
     }
 }
