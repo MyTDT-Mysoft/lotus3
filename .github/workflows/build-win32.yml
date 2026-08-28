@@ -12,6 +12,10 @@ on:
           - debug
           - release
 
+permissions:
+  contents: write
+  id-token: write
+
 jobs:
   build-win32:
     runs-on: windows-latest
@@ -63,3 +67,5 @@ jobs:
           tag: win32-${{ github.run_number }}
           name: Windows x86 Build #${{ github.run_number }}
           draft: true
+          generateReleaseNotes: false
+          skipIfReleaseExists: false
